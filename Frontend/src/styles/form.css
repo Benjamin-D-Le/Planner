@@ -95,3 +95,17 @@
   background: #d9cabb;
   color: #2f241d;
 }
+
+@media (max-width: 600px) {
+  .note-form {
+    padding: 14px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+}

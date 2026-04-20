@@ -47,14 +47,12 @@ function getInitialNotes() {
 
 function PlannerPage() {
   const [notes, setNotes] = useState(getInitialNotes)
-
   const [formData, setFormData] = useState({
     title: '',
     content: '',
     category: '',
     color: '#fff8a6',
   })
-
   const [editingId, setEditingId] = useState(null)
   const [draggingId, setDraggingId] = useState(null)
 
@@ -66,15 +64,16 @@ function PlannerPage() {
   }, [notes])
 
   useEffect(() => {
-    function handleMouseMove(event) {
+    function updateDraggedNote(clientX, clientY) {
       if (draggingId === null || !boardRef.current) return
 
       const boardRect = boardRef.current.getBoundingClientRect()
-      const noteWidth = 240
-      const noteHeight = 240
+      const isMobile = window.innerWidth <= 600
+      const noteWidth = isMobile ? 200 : 240
+      const noteHeight = isMobile ? 200 : 240
 
-      let newX = event.clientX - boardRect.left - dragOffset.current.x
-      let newY = event.clientY - boardRect.top - dragOffset.current.y
+      let newX = clientX - boardRect.left - dragOffset.current.x
+      let newY = clientY - boardRect.top - dragOffset.current.y
 
       const maxX = Math.max(0, boardRect.width - noteWidth)
       const maxY = Math.max(0, boardRect.height - noteHeight)
@@ -89,16 +88,36 @@ function PlannerPage() {
       )
     }
 
-    function handleMouseUp() {
+    function handleMouseMove(event) {
+      updateDraggedNote(event.clientX, event.clientY)
+    }
+
+    function handleTouchMove(event) {
+      if (draggingId === null) return
+
+      const touch = event.touches[0]
+      if (!touch) return
+
+      event.preventDefault()
+      updateDraggedNote(touch.clientX, touch.clientY)
+    }
+
+    function stopDragging() {
       setDraggingId(null)
     }
 
     window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('mouseup', stopDragging)
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
+    window.addEventListener('touchend', stopDragging)
+    window.addEventListener('touchcancel', stopDragging)
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('mouseup', stopDragging)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', stopDragging)
+      window.removeEventListener('touchcancel', stopDragging)
     }
   }, [draggingId])
 
@@ -183,6 +202,28 @@ function PlannerPage() {
     )
   }
 
+  function bringNoteToFront(note) {
+    setNotes((prevNotes) => {
+      const selected = prevNotes.find((item) => item.id === note.id)
+      const others = prevNotes.filter((item) => item.id !== note.id)
+      return selected ? [...others, selected] : prevNotes
+    })
+  }
+
+  function handlePointerStart(clientX, clientY, note) {
+    if (!boardRef.current) return
+
+    const boardRect = boardRef.current.getBoundingClientRect()
+
+    dragOffset.current = {
+      x: clientX - boardRect.left - note.x,
+      y: clientY - boardRect.top - note.y,
+    }
+
+    setDraggingId(note.id)
+    bringNoteToFront(note)
+  }
+
   function handleMouseDown(event, note) {
     if (
       event.target.closest('button') ||
@@ -193,22 +234,23 @@ function PlannerPage() {
       return
     }
 
-    if (!boardRef.current) return
+    handlePointerStart(event.clientX, event.clientY, note)
+  }
 
-    const boardRect = boardRef.current.getBoundingClientRect()
-
-    dragOffset.current = {
-      x: event.clientX - boardRect.left - note.x,
-      y: event.clientY - boardRect.top - note.y,
+  function handleTouchStart(event, note) {
+    if (
+      event.target.closest('button') ||
+      event.target.closest('input') ||
+      event.target.closest('textarea') ||
+      event.target.closest('select')
+    ) {
+      return
     }
 
-    setDraggingId(note.id)
+    const touch = event.touches[0]
+    if (!touch) return
 
-    setNotes((prevNotes) => {
-      const selected = prevNotes.find((item) => item.id === note.id)
-      const others = prevNotes.filter((item) => item.id !== note.id)
-      return selected ? [...others, selected] : prevNotes
-    })
+    handlePointerStart(touch.clientX, touch.clientY, note)
   }
 
   const completedCount = notes.filter((note) => note.completed).length
@@ -249,6 +291,7 @@ function PlannerPage() {
               note={note}
               isDragging={draggingId === note.id}
               onMouseDown={handleMouseDown}
+              onTouchStart={handleTouchStart}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onToggleComplete={handleToggleComplete}

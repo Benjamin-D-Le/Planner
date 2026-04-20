@@ -2,6 +2,7 @@ function Note({
   note,
   isDragging,
   onMouseDown,
+  onTouchStart,
   onEdit,
   onDelete,
   onToggleComplete,
@@ -17,6 +18,7 @@ function Note({
         top: `${note.y}px`,
       }}
       onMouseDown={(event) => onMouseDown(event, note)}
+      onTouchStart={(event) => onTouchStart(event, note)}
     >
       <div className="thumbtack" />
 

@@ -7,6 +7,7 @@
   box-shadow: 4px 8px 18px rgba(0, 0, 0, 0.2);
   cursor: grab;
   user-select: none;
+  touch-action: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
   display: flex;
   flex-direction: column;
@@ -129,3 +130,29 @@
   background: rgba(170, 40, 40, 0.15);
   color: #7c1d1d;
 }
+
+@media (max-width: 600px) {
+  .note {
+    width: 200px;
+    min-height: 200px;
+    padding: 16px 12px 12px;
+  }
+
+  .note h3 {
+    font-size: 1rem;
+  }
+
+  .note p {
+    font-size: 0.9rem;
+  }
+
+  .note-actions {
+    justify-content: center;
+  }
+
+  .note-actions button {
+    padding: 10px 12px;
+    font-size: 0.8rem;
+  }
+}
+

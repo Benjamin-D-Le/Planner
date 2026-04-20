@@ -91,3 +91,27 @@
     min-height: 70vh;
   }
 }
+
+@media (max-width: 600px) {
+  .planner-sidebar {
+    padding: 16px;
+    gap: 18px;
+  }
+
+  .planner-header h1 {
+    font-size: 1.6rem;
+  }
+
+  .planner-header p {
+    font-size: 0.95rem;
+  }
+
+  .board-area {
+    padding: 12px;
+  }
+
+  .board {
+    min-height: 65vh;
+    border-radius: 12px;
+  }
+}
