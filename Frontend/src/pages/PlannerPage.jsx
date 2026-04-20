@@ -1,147 +1,260 @@
-import { useState } from 'react'
-import Board from '../components/Board'
+import { useEffect, useRef, useState } from 'react'
+import Note from '../components/Note'
+import NoteForm from '../components/NoteForm'
 import '../styles/board.css'
+import '../styles/form.css'
+import '../styles/note.css'
+
+const starterNotes = [
+  {
+    id: 1,
+    title: 'Finish planner UI',
+    content: 'Build the bulletin board and note interactions.',
+    category: 'Development',
+    color: '#fff8a6',
+    completed: false,
+    x: 80,
+    y: 90,
+  },
+  {
+    id: 2,
+    title: 'Study',
+    content: 'Review class notes and organize assignments.',
+    category: 'School',
+    color: '#ffd6a5',
+    completed: false,
+    x: 340,
+    y: 140,
+  },
+]
+
+function getInitialNotes() {
+  try {
+    const saved = localStorage.getItem('planner-notes')
+    if (!saved) return starterNotes
+
+    const parsed = JSON.parse(saved)
+
+    if (!Array.isArray(parsed)) return starterNotes
+
+    return parsed
+  } catch (error) {
+    console.error('Failed to read saved notes:', error)
+    localStorage.removeItem('planner-notes')
+    return starterNotes
+  }
+}
 
 function PlannerPage() {
-  const [notes, setNotes] = useState([
-    {
-      id: 1,
-      title: 'School Tasks',
-      category: 'School',
-      color: '#ffe88f',
-      tasks: ['Finish planner UI', 'Review biology notes'],
-    },
-    {
-      id: 2,
-      title: 'Personal',
-      category: 'Personal',
-      color: '#ffd6e7',
-      tasks: ['Buy groceries', 'Clean desk'],
-    },
-  ])
+  const [notes, setNotes] = useState(getInitialNotes)
 
-  const [title, setTitle] = useState('')
-  const [category, setCategory] = useState('School')
-  const [color, setColor] = useState('#ffe88f')
-  const [taskInput, setTaskInput] = useState('')
-  const [taskList, setTaskList] = useState([])
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: '',
+    color: '#fff8a6',
+  })
 
-  function addTaskToDraft() {
-    const trimmed = taskInput.trim()
-    if (!trimmed) return
-    setTaskList([...taskList, trimmed])
-    setTaskInput('')
-  }
+  const [editingId, setEditingId] = useState(null)
+  const [draggingId, setDraggingId] = useState(null)
 
-  function removeDraftTask(indexToRemove) {
-    setTaskList(taskList.filter((_, index) => index !== indexToRemove))
-  }
+  const dragOffset = useRef({ x: 0, y: 0 })
+  const boardRef = useRef(null)
 
-  function createNote() {
-    if (!title.trim() || taskList.length === 0) return
+  useEffect(() => {
+    localStorage.setItem('planner-notes', JSON.stringify(notes))
+  }, [notes])
 
-    const newNote = {
-      id: Date.now(),
-      title: title.trim(),
-      category,
-      color,
-      tasks: taskList,
+  useEffect(() => {
+    function handleMouseMove(event) {
+      if (draggingId === null || !boardRef.current) return
+
+      const boardRect = boardRef.current.getBoundingClientRect()
+      const noteWidth = 240
+      const noteHeight = 240
+
+      let newX = event.clientX - boardRect.left - dragOffset.current.x
+      let newY = event.clientY - boardRect.top - dragOffset.current.y
+
+      const maxX = Math.max(0, boardRect.width - noteWidth)
+      const maxY = Math.max(0, boardRect.height - noteHeight)
+
+      newX = Math.max(0, Math.min(newX, maxX))
+      newY = Math.max(0, Math.min(newY, maxY))
+
+      setNotes((prevNotes) =>
+        prevNotes.map((note) =>
+          note.id === draggingId ? { ...note, x: newX, y: newY } : note
+        )
+      )
     }
 
-    setNotes([newNote, ...notes])
-    setTitle('')
-    setCategory('School')
-    setColor('#ffe88f')
-    setTaskInput('')
-    setTaskList([])
+    function handleMouseUp() {
+      setDraggingId(null)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [draggingId])
+
+  function handleChange(event) {
+    const { name, value } = event.target
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
   }
 
-  function deleteNote(id) {
-    setNotes(notes.filter((note) => note.id !== id))
+  function resetForm() {
+    setFormData({
+      title: '',
+      content: '',
+      category: '',
+      color: '#fff8a6',
+    })
+    setEditingId(null)
   }
+
+  function handleSubmit(event) {
+    event.preventDefault()
+
+    if (!formData.title.trim() || !formData.content.trim()) return
+
+    if (editingId !== null) {
+      setNotes((prevNotes) =>
+        prevNotes.map((note) =>
+          note.id === editingId
+            ? {
+                ...note,
+                title: formData.title,
+                content: formData.content,
+                category: formData.category,
+                color: formData.color,
+              }
+            : note
+        )
+      )
+    } else {
+      const newNote = {
+        id: Date.now(),
+        title: formData.title,
+        content: formData.content,
+        category: formData.category,
+        color: formData.color,
+        completed: false,
+        x: 60 + (notes.length % 4) * 40,
+        y: 80 + (notes.length % 5) * 40,
+      }
+
+      setNotes((prevNotes) => [...prevNotes, newNote])
+    }
+
+    resetForm()
+  }
+
+  function handleEdit(note) {
+    setFormData({
+      title: note.title,
+      content: note.content,
+      category: note.category,
+      color: note.color,
+    })
+    setEditingId(note.id)
+  }
+
+  function handleDelete(id) {
+    setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id))
+
+    if (editingId === id) {
+      resetForm()
+    }
+  }
+
+  function handleToggleComplete(id) {
+    setNotes((prevNotes) =>
+      prevNotes.map((note) =>
+        note.id === id ? { ...note, completed: !note.completed } : note
+      )
+    )
+  }
+
+  function handleMouseDown(event, note) {
+    if (
+      event.target.closest('button') ||
+      event.target.closest('input') ||
+      event.target.closest('textarea') ||
+      event.target.closest('select')
+    ) {
+      return
+    }
+
+    if (!boardRef.current) return
+
+    const boardRect = boardRef.current.getBoundingClientRect()
+
+    dragOffset.current = {
+      x: event.clientX - boardRect.left - note.x,
+      y: event.clientY - boardRect.top - note.y,
+    }
+
+    setDraggingId(note.id)
+
+    setNotes((prevNotes) => {
+      const selected = prevNotes.find((item) => item.id === note.id)
+      const others = prevNotes.filter((item) => item.id !== note.id)
+      return selected ? [...others, selected] : prevNotes
+    })
+  }
+
+  const completedCount = notes.filter((note) => note.completed).length
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <div>
+    <div className="planner-page">
+      <aside className="planner-sidebar">
+        <div className="planner-header">
           <h1>My Planner Board</h1>
-          <p>Pin cute sticky notes for everything you need to do.</p>
+          <p>Pin tasks, drag them around, and keep everything in one place.</p>
         </div>
-      </header>
 
-      <main className="main-layout">
-        <section className="creator-panel">
-          <h2>Create a Sticky Note</h2>
-
-          <label>Title</label>
-          <input
-            type="text"
-            placeholder="Ex. Homework"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-
-          <label>Category</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
-            <option>School</option>
-            <option>Work</option>
-            <option>Personal</option>
-            <option>Health</option>
-          </select>
-
-          <label>Sticky Note Color</label>
-          <div className="color-picker">
-            {['#ffe88f', '#ffd6e7', '#c9f2c7', '#cfe7ff', '#e3d5ff'].map((swatch) => (
-              <button
-                key={swatch}
-                className={`color-dot ${color === swatch ? 'selected' : ''}`}
-                style={{ backgroundColor: swatch }}
-                onClick={() => setColor(swatch)}
-                type="button"
-              />
-            ))}
+        <div className="planner-stats">
+          <div className="stat-card">
+            <span>Total Notes</span>
+            <strong>{notes.length}</strong>
           </div>
+          <div className="stat-card">
+            <span>Completed</span>
+            <strong>{completedCount}</strong>
+          </div>
+        </div>
 
-          <label>Add Tasks</label>
-          <div className="task-input-row">
-            <input
-              type="text"
-              placeholder="Type one task"
-              value={taskInput}
-              onChange={(e) => setTaskInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  addTaskToDraft()
-                }
-              }}
+        <NoteForm
+          formData={formData}
+          editingId={editingId}
+          onChange={handleChange}
+          onSubmit={handleSubmit}
+          onCancel={resetForm}
+        />
+      </aside>
+
+      <main className="board-area">
+        <div className="board" ref={boardRef}>
+          {notes.map((note) => (
+            <Note
+              key={note.id}
+              note={note}
+              isDragging={draggingId === note.id}
+              onMouseDown={handleMouseDown}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onToggleComplete={handleToggleComplete}
             />
-            <button type="button" className="mini-btn" onClick={addTaskToDraft}>
-              Add
-            </button>
-          </div>
-
-          {taskList.length > 0 && (
-            <div className="draft-task-list">
-              {taskList.map((task, index) => (
-                <div key={index} className="draft-task-item">
-                  <span>{task}</span>
-                  <button type="button" onClick={() => removeDraftTask(index)}>
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button className="create-btn" onClick={createNote}>
-            Pin Note
-          </button>
-        </section>
-
-        <section className="board-wrapper">
-          <Board notes={notes} onDelete={deleteNote} />
-        </section>
+          ))}
+        </div>
       </main>
     </div>
   )
