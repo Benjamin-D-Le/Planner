@@ -1,306 +1,359 @@
 import { useEffect, useRef, useState } from 'react'
-import Note from '../components/Note'
-import NoteForm from '../components/NoteForm'
+import { useNavigate } from 'react-router-dom'
 import '../styles/board.css'
 import '../styles/form.css'
 import '../styles/note.css'
 
-const starterNotes = [
-  {
-    id: 1,
-    title: 'Finish planner UI',
-    content: 'Build the bulletin board and note interactions.',
-    category: 'Development',
-    color: '#fff8a6',
-    completed: false,
-    x: 80,
-    y: 90,
-  },
-  {
-    id: 2,
-    title: 'Study',
-    content: 'Review class notes and organize assignments.',
-    category: 'School',
-    color: '#ffd6a5',
-    completed: false,
-    x: 340,
-    y: 140,
-  },
+const STORAGE_KEY = 'planner-postits'
+
+const NOTE_COLORS = [
+  '#fff3a3',
+  '#ffd1dc',
+  '#cde9ff',
+  '#d9f8c4',
+  '#e7d7ff',
+  '#ffd2a6',
 ]
 
-function getInitialNotes() {
-  try {
-    const saved = localStorage.getItem('planner-notes')
-    if (!saved) return starterNotes
-
-    const parsed = JSON.parse(saved)
-
-    if (!Array.isArray(parsed)) return starterNotes
-
-    return parsed
-  } catch (error) {
-    console.error('Failed to read saved notes:', error)
-    localStorage.removeItem('planner-notes')
-    return starterNotes
-  }
-}
-
 function PlannerPage() {
-  const [notes, setNotes] = useState(getInitialNotes)
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    category: '',
-    color: '#fff8a6',
-  })
-  const [editingId, setEditingId] = useState(null)
-  const [draggingId, setDraggingId] = useState(null)
-
-  const dragOffset = useRef({ x: 0, y: 0 })
+  const navigate = useNavigate()
   const boardRef = useRef(null)
 
+  const [notes, setNotes] = useState(() => {
+    const savedNotes = localStorage.getItem(STORAGE_KEY)
+    return savedNotes ? JSON.parse(savedNotes) : []
+  })
+
+  const [formData, setFormData] = useState({
+    category: '',
+    title: '',
+    details: '',
+    dueDate: '',
+    color: NOTE_COLORS[0],
+  })
+
+  const [draggingNote, setDraggingNote] = useState(null)
+
   useEffect(() => {
-    localStorage.setItem('planner-notes', JSON.stringify(notes))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
+
+    window.dispatchEvent(
+      new CustomEvent('planner-postits-updated', {
+        detail: notes,
+      })
+    )
   }, [notes])
 
-  useEffect(() => {
-    function updateDraggedNote(clientX, clientY) {
-      if (draggingId === null || !boardRef.current) return
-
-      const boardRect = boardRef.current.getBoundingClientRect()
-      const isMobile = window.innerWidth <= 600
-      const noteWidth = isMobile ? 200 : 240
-      const noteHeight = isMobile ? 200 : 240
-
-      let newX = clientX - boardRect.left - dragOffset.current.x
-      let newY = clientY - boardRect.top - dragOffset.current.y
-
-      const maxX = Math.max(0, boardRect.width - noteWidth)
-      const maxY = Math.max(0, boardRect.height - noteHeight)
-
-      newX = Math.max(0, Math.min(newX, maxX))
-      newY = Math.max(0, Math.min(newY, maxY))
-
-      setNotes((prevNotes) =>
-        prevNotes.map((note) =>
-          note.id === draggingId ? { ...note, x: newX, y: newY } : note
-        )
-      )
-    }
-
-    function handleMouseMove(event) {
-      updateDraggedNote(event.clientX, event.clientY)
-    }
-
-    function handleTouchMove(event) {
-      if (draggingId === null) return
-
-      const touch = event.touches[0]
-      if (!touch) return
-
-      event.preventDefault()
-      updateDraggedNote(touch.clientX, touch.clientY)
-    }
-
-    function stopDragging() {
-      setDraggingId(null)
-    }
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', stopDragging)
-    window.addEventListener('touchmove', handleTouchMove, { passive: false })
-    window.addEventListener('touchend', stopDragging)
-    window.addEventListener('touchcancel', stopDragging)
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', stopDragging)
-      window.removeEventListener('touchmove', handleTouchMove)
-      window.removeEventListener('touchend', stopDragging)
-      window.removeEventListener('touchcancel', stopDragging)
-    }
-  }, [draggingId])
-
-  function handleChange(event) {
+  function handleInputChange(event) {
     const { name, value } = event.target
-    setFormData((prev) => ({
-      ...prev,
+
+    setFormData((currentData) => ({
+      ...currentData,
       [name]: value,
     }))
   }
 
-  function resetForm() {
-    setFormData({
-      title: '',
-      content: '',
-      category: '',
-      color: '#fff8a6',
-    })
-    setEditingId(null)
+  function handleColorChange(color) {
+    setFormData((currentData) => ({
+      ...currentData,
+      color,
+    }))
   }
 
   function handleSubmit(event) {
     event.preventDefault()
 
-    if (!formData.title.trim() || !formData.content.trim()) return
+    if (!formData.title.trim()) return
 
-    if (editingId !== null) {
-      setNotes((prevNotes) =>
-        prevNotes.map((note) =>
-          note.id === editingId
-            ? {
-                ...note,
-                title: formData.title,
-                content: formData.content,
-                category: formData.category,
-                color: formData.color,
-              }
-            : note
-        )
-      )
-    } else {
-      const newNote = {
-        id: Date.now(),
-        title: formData.title,
-        content: formData.content,
-        category: formData.category,
-        color: formData.color,
-        completed: false,
-        x: 60 + (notes.length % 4) * 40,
-        y: 80 + (notes.length % 5) * 40,
-      }
-
-      setNotes((prevNotes) => [...prevNotes, newNote])
+    const newNote = {
+      id: crypto.randomUUID(),
+      category: formData.category.trim() || 'General',
+      title: formData.title.trim(),
+      details: formData.details.trim(),
+      dueDate: formData.dueDate || null,
+      color: formData.color,
+      completed: false,
+      x: 40 + Math.random() * 120,
+      y: 40 + Math.random() * 120,
+      createdAt: new Date().toISOString(),
     }
 
-    resetForm()
-  }
+    setNotes((currentNotes) => [...currentNotes, newNote])
 
-  function handleEdit(note) {
     setFormData({
-      title: note.title,
-      content: note.content,
-      category: note.category,
-      color: note.color,
+      category: '',
+      title: '',
+      details: '',
+      dueDate: '',
+      color: NOTE_COLORS[0],
     })
-    setEditingId(note.id)
   }
 
-  function handleDelete(id) {
-    setNotes((prevNotes) => prevNotes.filter((note) => note.id !== id))
-
-    if (editingId === id) {
-      resetForm()
-    }
+  function clearForm() {
+    setFormData({
+      category: '',
+      title: '',
+      details: '',
+      dueDate: '',
+      color: NOTE_COLORS[0],
+    })
   }
 
-  function handleToggleComplete(id) {
-    setNotes((prevNotes) =>
-      prevNotes.map((note) =>
+  function deleteNote(id) {
+    setNotes((currentNotes) => currentNotes.filter((note) => note.id !== id))
+  }
+
+  function toggleComplete(id) {
+    setNotes((currentNotes) =>
+      currentNotes.map((note) =>
         note.id === id ? { ...note, completed: !note.completed } : note
       )
     )
   }
 
-  function bringNoteToFront(note) {
-    setNotes((prevNotes) => {
-      const selected = prevNotes.find((item) => item.id === note.id)
-      const others = prevNotes.filter((item) => item.id !== note.id)
-      return selected ? [...others, selected] : prevNotes
+  function handlePointerDown(event, note) {
+    if (event.target.closest('button')) return
+
+    const board = boardRef.current
+    if (!board) return
+
+    const boardRect = board.getBoundingClientRect()
+
+    setDraggingNote({
+      id: note.id,
+      offsetX: event.clientX - boardRect.left - note.x,
+      offsetY: event.clientY - boardRect.top - note.y,
     })
+
+    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  function handlePointerStart(clientX, clientY, note) {
-    if (!boardRef.current) return
+  function handlePointerMove(event) {
+    if (!draggingNote) return
 
-    const boardRect = boardRef.current.getBoundingClientRect()
+    const board = boardRef.current
+    if (!board) return
 
-    dragOffset.current = {
-      x: clientX - boardRect.left - note.x,
-      y: clientY - boardRect.top - note.y,
-    }
+    const boardRect = board.getBoundingClientRect()
 
-    setDraggingId(note.id)
-    bringNoteToFront(note)
+    const newX = event.clientX - boardRect.left - draggingNote.offsetX
+    const newY = event.clientY - boardRect.top - draggingNote.offsetY
+
+    setNotes((currentNotes) =>
+      currentNotes.map((note) =>
+        note.id === draggingNote.id
+          ? {
+              ...note,
+              x: Math.max(8, Math.min(newX, boardRect.width - 260)),
+              y: Math.max(8, Math.min(newY, boardRect.height - 240)),
+            }
+          : note
+      )
+    )
   }
 
-  function handleMouseDown(event, note) {
-    if (
-      event.target.closest('button') ||
-      event.target.closest('input') ||
-      event.target.closest('textarea') ||
-      event.target.closest('select')
-    ) {
-      return
-    }
-
-    handlePointerStart(event.clientX, event.clientY, note)
+  function handlePointerUp() {
+    setDraggingNote(null)
   }
 
-  function handleTouchStart(event, note) {
-    if (
-      event.target.closest('button') ||
-      event.target.closest('input') ||
-      event.target.closest('textarea') ||
-      event.target.closest('select')
-    ) {
-      return
-    }
-
-    const touch = event.touches[0]
-    if (!touch) return
-
-    handlePointerStart(touch.clientX, touch.clientY, note)
+  function goToCalendar() {
+    navigate('/calendar')
   }
 
-  const completedCount = notes.filter((note) => note.completed).length
+  const totalNotes = notes.length
+  const completedNotes = notes.filter((note) => note.completed).length
+  const calendarNotes = notes.filter((note) => note.dueDate).length
 
   return (
-    <div className="planner-page">
-      <aside className="planner-sidebar">
-        <div className="planner-header">
-          <h1>My Planner Board</h1>
-          <p>Pin tasks, drag them around, and keep everything in one place.</p>
-        </div>
+    <section className="planner-page" id="planner-page">
+
+        <aside className="planner-sidebar">
+          <div className="planner-header">
+            <h1>Post-It Planner</h1>
+            <p>
+              Add tasks, reminders, and ideas. Give a post-it a due date to make
+              it appear on the calendar.
+            </p>
+          </div>
+
+          <button className="page-nav-button" onClick={goToCalendar}>
+            Calendar →
+          </button>
+
+          <form className="note-form" onSubmit={handleSubmit}>
+          <h2>Add New Note</h2>
+
+          <label htmlFor="category">Category</label>
+          <input
+            id="category"
+            name="category"
+            type="text"
+            placeholder="School, work, personal..."
+            value={formData.category}
+            onChange={handleInputChange}
+          />
+
+          <label htmlFor="title">Title</label>
+          <input
+            id="title"
+            name="title"
+            type="text"
+            placeholder="What do you need to do?"
+            value={formData.title}
+            onChange={handleInputChange}
+          />
+
+          <label htmlFor="details">Details</label>
+          <textarea
+            id="details"
+            name="details"
+            placeholder="Optional notes..."
+            value={formData.details}
+            onChange={handleInputChange}
+          />
+
+          <label htmlFor="dueDate">Due Date</label>
+          <input
+            id="dueDate"
+            name="dueDate"
+            type="date"
+            value={formData.dueDate}
+            onChange={handleInputChange}
+          />
+
+          <label>Note Color</label>
+          <div className="color-picker">
+            {NOTE_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                className={`color-bubble ${
+                  formData.color === color ? 'selected' : ''
+                }`}
+                style={{ backgroundColor: color }}
+                aria-label={`Choose ${color} note color`}
+                onClick={() => handleColorChange(color)}
+              />
+            ))}
+          </div>
+
+          <div className="form-actions">
+            <button type="submit">Add Note</button>
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={clearForm}
+            >
+              Clear
+            </button>
+          </div>
+        </form>
 
         <div className="planner-stats">
           <div className="stat-card">
             <span>Total Notes</span>
-            <strong>{notes.length}</strong>
+            <strong>{totalNotes}</strong>
           </div>
+
           <div className="stat-card">
             <span>Completed</span>
-            <strong>{completedCount}</strong>
+            <strong>{completedNotes}</strong>
           </div>
         </div>
 
-        <NoteForm
-          formData={formData}
-          editingId={editingId}
-          onChange={handleChange}
-          onSubmit={handleSubmit}
-          onCancel={resetForm}
-        />
+        <div className="planner-stats">
+          <div className="stat-card full-stat-card">
+            <span>On Calendar</span>
+            <strong>{calendarNotes}</strong>
+          </div>
+        </div>
       </aside>
 
       <main className="board-area">
-        <div className="board" ref={boardRef}>
-          {notes.map((note) => (
-            <Note
-              key={note.id}
-              note={note}
-              isDragging={draggingId === note.id}
-              onMouseDown={handleMouseDown}
-              onTouchStart={handleTouchStart}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onToggleComplete={handleToggleComplete}
-            />
-          ))}
+        <div
+          className="board"
+          ref={boardRef}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        >
+          {notes.length === 0 ? (
+            <div className="board-empty-state">
+              <h2>No post-its yet</h2>
+              <p>Add your first note using the form on the left.</p>
+            </div>
+          ) : (
+            notes.map((note) => (
+              <article
+                key={note.id}
+                className={`note ${note.completed ? 'completed' : ''} ${
+                  draggingNote?.id === note.id ? 'dragging' : ''
+                }`}
+                style={{
+                  left: `${note.x}px`,
+                  top: `${note.y}px`,
+                  backgroundColor: note.color,
+                }}
+                onPointerDown={(event) => handlePointerDown(event, note)}
+              >
+                <div className="thumbtack" />
+
+                <div className="note-content">
+                  <div className="note-top-row">
+                    <span
+                      className={`note-category ${
+                        note.category ? '' : 'empty'
+                      }`}
+                    >
+                      {note.category || 'General'}
+                    </span>
+
+                    {note.completed && (
+                      <span className="note-status">Done</span>
+                    )}
+                  </div>
+
+                  <h3>{note.title}</h3>
+
+                  {note.details && <p>{note.details}</p>}
+
+                  {note.dueDate && (
+                    <span className="note-due-date">
+                      Due: {formatDate(note.dueDate)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="note-actions">
+                  <button type="button" onClick={() => toggleComplete(note.id)}>
+                    {note.completed ? 'Undo' : 'Complete'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="delete-button"
+                    onClick={() => deleteNote(note.id)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </main>
-    </div>
+    </section>
   )
+}
+
+function formatDate(dateString) {
+  const date = new Date(`${dateString}T00:00:00`)
+
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 export default PlannerPage

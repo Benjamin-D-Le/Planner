@@ -103,6 +103,17 @@
   width: 100%;
 }
 
+.note-due-date {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
+  color: #5f3b1d;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .note.completed h3,
 .note.completed p {
   text-decoration: line-through;
@@ -113,6 +124,7 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 16px;
+  justify-content: center;
 }
 
 .note-actions button {
@@ -155,4 +167,3 @@
     font-size: 0.8rem;
   }
 }
-

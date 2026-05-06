@@ -26,6 +26,25 @@
   text-align: center;
 }
 
+.page-nav-button {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: #fffaf2;
+  color: #4d382a;
+  font-weight: 800;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border: 2px solid #d9cabb;
+  transition: transform 0.15s ease, box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.page-nav-button:hover {
+  transform: translateY(-2px);
+  background: #fff3df;
+  box-shadow: 0 9px 20px rgba(0, 0, 0, 0.12);
+}
+
 .planner-stats {
   display: flex;
   gap: 12px;
@@ -73,6 +92,22 @@
   overflow: hidden;
 }
 
+.board-empty-state {
+  position: absolute;
+  inset: 24px;
+  border: 3px dashed rgba(77, 56, 42, 0.35);
+  border-radius: 18px;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #4e3f36;
+  background: rgba(255, 250, 242, 0.25);
+}
+
+.board-empty-state h2 {
+  margin-bottom: 8px;
+}
+
 @media (max-width: 900px) {
   .planner-page {
     grid-template-columns: 1fr;
@@ -113,5 +148,9 @@
   .board {
     min-height: 65vh;
     border-radius: 12px;
+  }
+
+  .page-nav-button {
+    width: 100%;
   }
 }
